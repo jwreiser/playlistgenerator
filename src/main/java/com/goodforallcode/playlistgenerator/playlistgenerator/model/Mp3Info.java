@@ -32,7 +32,9 @@ public class Mp3Info {
     }
     @Override
     public String toString() {
-        return title+" - "+artist+" - "+album;
+
+        return title+" - "+artist;//+" - "+album;
+
     }
 
 }

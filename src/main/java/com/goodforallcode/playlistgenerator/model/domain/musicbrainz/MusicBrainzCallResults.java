@@ -1,4 +1,4 @@
-package com.goodforallcode.playlistgenerator.playlistgenerator.model.rest.musicbrainz;
+package com.goodforallcode.playlistgenerator.model.domain.musicbrainz;
 
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -6,7 +6,6 @@ import com.goodforallcode.playlistgenerator.playlistgenerator.model.Mp3Info;
 import com.mpatric.mp3agic.ID3v1Genres;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;

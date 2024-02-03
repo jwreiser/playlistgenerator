@@ -1,23 +1,22 @@
-package com.goodforallcode.playlistgenerator.playlistgenerator.model.rest.musicbrainz;
+package com.goodforallcode.playlistgenerator.model.domain.musicbrainz;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
 
-public class Release {
-    int count;
+public class Recording {
+    int score;
     String title;
-    String status;
+    int length;
     @JsonProperty ("artist-credit")
     List<ArtistCredit> artistCredits;
-    @JsonProperty ("track-count")
-    int trackCount;
+    String disambiguation;
+    List<Release> releases;
+    List<Tag> tags;
 
-    List<Media> media=new ArrayList<>();
 }

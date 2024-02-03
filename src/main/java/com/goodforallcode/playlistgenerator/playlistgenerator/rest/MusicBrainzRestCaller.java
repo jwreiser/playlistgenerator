@@ -1,12 +1,11 @@
 package com.goodforallcode.playlistgenerator.playlistgenerator.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.goodforallcode.playlistgenerator.playlistgenerator.model.rest.musicbrainz.MusicBrainzCallResults;
+import com.goodforallcode.playlistgenerator.model.domain.musicbrainz.MusicBrainzCallResults;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.InaccessibleObjectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;

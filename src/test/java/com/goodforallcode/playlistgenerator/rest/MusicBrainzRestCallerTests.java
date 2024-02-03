@@ -1,6 +1,6 @@
 package com.goodforallcode.playlistgenerator.rest;
 
-import com.goodforallcode.playlistgenerator.playlistgenerator.model.rest.musicbrainz.MusicBrainzCallResults;
+import com.goodforallcode.playlistgenerator.model.domain.musicbrainz.MusicBrainzCallResults;
 import com.goodforallcode.playlistgenerator.playlistgenerator.rest.MusicBrainzRestCaller;
 import org.junit.jupiter.api.Test;
 

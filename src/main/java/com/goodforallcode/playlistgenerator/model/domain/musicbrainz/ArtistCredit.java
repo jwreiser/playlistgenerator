@@ -1,4 +1,4 @@
-package com.goodforallcode.playlistgenerator.playlistgenerator.model.rest.musicbrainz;
+package com.goodforallcode.playlistgenerator.model.domain.musicbrainz;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;

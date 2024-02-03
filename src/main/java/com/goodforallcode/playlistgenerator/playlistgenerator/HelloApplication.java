@@ -1,26 +1,24 @@
 package com.goodforallcode.playlistgenerator.playlistgenerator;
 
-import com.goodforallcode.playlistgenerator.playlistgenerator.model.Mp3Info;
+import com.goodforallcode.playlistgenerator.javafx.PlaylistGeneratingTask;
+import com.goodforallcode.playlistgenerator.playlistgenerator.service.MusicBrainzAlbumService;
 import com.goodforallcode.playlistgenerator.playlistgenerator.service.SongInformationService;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 public class HelloApplication extends Application {
-    static SongInformationService service=new SongInformationService();
+    static SongInformationService songService =new SongInformationService();
+    static MusicBrainzAlbumService musicBrainzAlbumService =new MusicBrainzAlbumService();
 
     public static void main(String[] args) {
         launch();
@@ -35,18 +33,32 @@ public class HelloApplication extends Application {
         TextField directoryInput=new TextField();
 
         Button directoryButton=new Button();
-        directoryButton.setText("Choose Directory");
+        directoryButton.setText("Choose Music Directory");
         directoryButton.setOnAction(e->chooseDirectory(primaryStage,directoryInput));
 
         Label directoryLabel=new Label();
         directoryLabel.setText("Directory");
         directoryLabel.setLabelFor(directoryInput);
 
+        TextField usernameInput=new TextField();
+
+        Label usernameLabel=new Label();
+        usernameLabel.setText("Spotify UserName");
+        usernameLabel.setLabelFor(usernameInput);
+
+        TextField playlistInput=new TextField();
+
+        Label playlistLabel=new Label();
+        playlistLabel.setText("Playlist Name");
+        playlistLabel.setLabelFor(playlistInput);
+
+        CheckBox tagsCheckBox = new CheckBox("Manually Configure Tags");
+
         ProgressBar progress = new ProgressBar(0);
 
         Button startButton=new Button();
         startButton.setText("Generate Playlist");
-        startButton.setOnAction(e->generatePlaylist(directoryInput,progress));
+        startButton.setOnAction(e->generatePlaylist(directoryInput.getText(),progress,usernameInput.getText(),playlistInput.getText(),tagsCheckBox.isSelected()));
 
         Button closeButton=new Button();
         closeButton.setText("Close");
@@ -54,10 +66,10 @@ public class HelloApplication extends Application {
         closeButton.setDisable(true);
 
         VBox pane=new VBox(15);
-        pane.getChildren().addAll(directoryButton,directoryLabel,directoryInput,progress,startButton,closeButton);
+        pane.getChildren().addAll(directoryButton,directoryLabel,directoryInput,usernameLabel,usernameInput,playlistLabel,playlistInput,tagsCheckBox,progress,startButton,closeButton);
         pane.setAlignment(Pos.CENTER);
 
-        Scene scene=new Scene(pane,300,300);
+        Scene scene=new Scene(pane,500,300);
 
         primaryStage.setScene(scene);
         primaryStage.setTitle("Generate Playlist");
@@ -66,7 +78,7 @@ public class HelloApplication extends Application {
     }
     public void chooseDirectory(Stage stage,TextField directoryInput){
         DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("JavaFX Projects");
+        chooser.setTitle("Music Directories");
 
         File defaultDirectory = new File("c:/");
         chooser.setInitialDirectory(defaultDirectory);
@@ -74,19 +86,23 @@ public class HelloApplication extends Application {
         File selectedDirectory = chooser.showDialog(stage);
         directoryInput.setText(selectedDirectory.getAbsolutePath());
     }
-    public void generatePlaylist(TextField directoryInput,ProgressBar progress){
-        Set<String> visitedDirectories=new HashSet();
-        Set<String> remainingDirectories=new HashSet();
-        Set<Mp3Info> songs = null;
-        try {
-            songs = service.getSongInformation(directoryInput.getText(),visitedDirectories,remainingDirectories,progress);
-            for(Mp3Info entry:songs){
-                System.out.println(entry);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
 
+    public void chooseFile(Stage stage,TextField fileInput){
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Playlist");
+
+        File defaultDirectory = new File("c:/");
+        chooser.setInitialDirectory(defaultDirectory);
+
+        File selectedDirectory = chooser.showOpenDialog(stage);
+        fileInput.setText(selectedDirectory.getAbsolutePath());
+    }
+    public void generatePlaylist(String directory,ProgressBar progress, String userName,String playlistName,boolean manuallyConfigureMp3Tags){
+        PlaylistGeneratingTask task = new PlaylistGeneratingTask(directory,userName,playlistName,manuallyConfigureMp3Tags);
+//        progress.progressProperty().bind(task.progressProperty());
+        task.setProgressBar(progress);
+        new Thread(task).start();
+//        Platform.runLater(task);
     }
 
     public void close(){
