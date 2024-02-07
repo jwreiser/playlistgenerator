@@ -16,7 +16,7 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.io.IOException;
 
-public class HelloApplication extends Application {
+public class JavaFXApplication extends Application {
     static SongInformationService songService =new SongInformationService();
     static MusicBrainzAlbumService musicBrainzAlbumService =new MusicBrainzAlbumService();
 
@@ -26,7 +26,7 @@ public class HelloApplication extends Application {
     Stage stage;
     @Override
     public void start(Stage primaryStage) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("hello-view.fxml"));
+        FXMLLoader fxmlLoader = new FXMLLoader(JavaFXApplication.class.getResource("hello-view.fxml"));
 
         stage=primaryStage;
 
@@ -53,12 +53,13 @@ public class HelloApplication extends Application {
         playlistLabel.setLabelFor(playlistInput);
 
         CheckBox tagsCheckBox = new CheckBox("Manually Configure Tags");
+        CheckBox disambiguateCheckBox = new CheckBox("Manually Disambiguate Artists/Albums");
 
         ProgressBar progress = new ProgressBar(0);
 
         Button startButton=new Button();
         startButton.setText("Generate Playlist");
-        startButton.setOnAction(e->generatePlaylist(directoryInput.getText(),progress,usernameInput.getText(),playlistInput.getText(),tagsCheckBox.isSelected()));
+        startButton.setOnAction(e->generatePlaylist(directoryInput.getText(),progress,usernameInput.getText(),playlistInput.getText(),tagsCheckBox.isSelected(),disambiguateCheckBox.isSelected()));
 
         Button closeButton=new Button();
         closeButton.setText("Close");
@@ -66,10 +67,10 @@ public class HelloApplication extends Application {
         closeButton.setDisable(true);
 
         VBox pane=new VBox(15);
-        pane.getChildren().addAll(directoryButton,directoryLabel,directoryInput,usernameLabel,usernameInput,playlistLabel,playlistInput,tagsCheckBox,progress,startButton,closeButton);
+        pane.getChildren().addAll(directoryButton,directoryLabel,directoryInput,usernameLabel,usernameInput,playlistLabel,playlistInput,tagsCheckBox,disambiguateCheckBox,progress,startButton,closeButton);
         pane.setAlignment(Pos.CENTER);
 
-        Scene scene=new Scene(pane,500,300);
+        Scene scene=new Scene(pane,500,500/*vert*/);
 
         primaryStage.setScene(scene);
         primaryStage.setTitle("Generate Playlist");
@@ -97,8 +98,8 @@ public class HelloApplication extends Application {
         File selectedDirectory = chooser.showOpenDialog(stage);
         fileInput.setText(selectedDirectory.getAbsolutePath());
     }
-    public void generatePlaylist(String directory,ProgressBar progress, String userName,String playlistName,boolean manuallyConfigureMp3Tags){
-        PlaylistGeneratingTask task = new PlaylistGeneratingTask(directory,userName,playlistName,manuallyConfigureMp3Tags);
+    public void generatePlaylist(String directory,ProgressBar progress, String userName,String playlistName,boolean manuallyConfigureMp3Tags,boolean disambiguate){
+        PlaylistGeneratingTask task = new PlaylistGeneratingTask(directory,userName,playlistName,manuallyConfigureMp3Tags,disambiguate);
 //        progress.progressProperty().bind(task.progressProperty());
         task.setProgressBar(progress);
         new Thread(task).start();

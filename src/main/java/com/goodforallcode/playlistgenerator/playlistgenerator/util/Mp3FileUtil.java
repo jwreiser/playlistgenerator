@@ -1,6 +1,7 @@
 package com.goodforallcode.playlistgenerator.playlistgenerator.util;
 
 import com.goodforallcode.playlistgenerator.model.domain.Album;
+import com.goodforallcode.playlistgenerator.model.domain.spotify.SpotifyTrack;
 import com.goodforallcode.playlistgenerator.playlistgenerator.model.Mp3Info;
 import com.mpatric.mp3agic.*;
 import org.jetbrains.annotations.NotNull;
@@ -79,10 +80,17 @@ public class Mp3FileUtil {
 
     public static  ID3v1 getTag(Mp3File mp3){
         ID3v1 tag=null;
-        if(mp3.getId3v2Tag()!=null){
-            tag = mp3.getId3v2Tag();
-        }else if(mp3.getId3v1Tag()!=null){
+        if(mp3.getId3v1Tag()!=null){
             tag = mp3.getId3v1Tag();
+            //for some reason v1 tags sometimes don't return the full comment and if they miss retry we run forever
+            if(mp3.getId3v2Tag()!=null){
+                ID3v2 v2Tag=mp3.getId3v2Tag();
+                if(v2Tag.getComment()!=null && v2Tag.getComment().contains(tag.getComment())){
+                    tag.setComment(v2Tag.getComment());
+                }
+            }
+        }else if(mp3.getId3v2Tag()!=null){
+            tag = mp3.getId3v2Tag();
         }
         return tag;
     }
@@ -90,6 +98,11 @@ public class Mp3FileUtil {
         String fileName = getSavingFileName(file.toAbsolutePath().toString());
         boolean success=false;
         try {
+            //move tag to v1 if it is not there
+            ID3v1 tag=getTag(mp3);
+            mp3.setId3v2Tag(convertTag(tag));
+            mp3.setId3v1Tag(tag);
+
             mp3.save(fileName);
             file.toFile().delete();
 
@@ -104,8 +117,11 @@ public class Mp3FileUtil {
 
             }
             success=true;
-        } catch (IOException | NotSupportedException |InvalidDataException|UnsupportedTagException e) {
+        } catch (IOException  |InvalidDataException|UnsupportedTagException e) {
             throw new RuntimeException(e);
+        }catch (NotSupportedException nse){
+            //there is generally nothing we can do here and generally we just need to skip the file
+            System.err.println("There is a problem with the file at "+file.getFileName());
         }
         return success;
     }
@@ -124,10 +140,16 @@ public class Mp3FileUtil {
         return fileName;
     }
 
-    public ID3v2 convertTag(ID3v1 source){
+    public static ID3v2 convertTag(ID3v1 source){
         ID3v2 result=new ID3v23Tag();
-        result.setGenre(source.getGenre());
-        result.setGenreDescription(source.getGenreDescription());
+        if(source.getGenre()>0) {
+            result.setGenre(source.getGenre());
+            try {
+                result.setGenreDescription(source.getGenreDescription());
+            }catch (IllegalArgumentException ie){
+                //genre's not important leave it out
+            }
+        }
         result.setTitle(source.getTitle());
         result.setArtist(source.getArtist());
         result.setAlbum(source.getAlbum());
@@ -151,14 +173,41 @@ public class Mp3FileUtil {
         return result;
     }
 
+    public static boolean wasEveryFilePublished(Path directory) {
+        boolean result = true;
+
+        for (File file : directory.toFile().listFiles()) {
+            if(file.isFile()&&file.getName().endsWith(".mp3")) {
+                result = fileWasPublishedOrCantBe(file);
+                if (!result) {
+                    break;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public static boolean wasEveryFilePublished(Album album) {
+        boolean result = true;
+
+        for (File file : album.getFiles()) {
+            result = fileWasPublishedOrCantBe(file);
+            if(!result){
+                break;
+            }
+        }
+
+        return result;
+    }
+
     public static boolean fileHasSpotifyInformation(File file) {
         boolean result=false;
         try {
             Mp3File mp3 = new Mp3File(file);
 
             ID3v1 tag = getTag(mp3);
-            if (tag != null && tag.getComment()!=null && ((tag.getComment().contains("spotifyAlbumId") && tag.getComment().contains("spotifyTrackId"))
-                    ||tag.getComment().contains("spotifyExistenceCheckFailed"))) {
+            if (tag != null && tag.getComment()!=null && ( tag.getComment().contains("spotifyTrackId") ||tag.getComment().contains("spotifyExistenceCheckFailed"))) {
                 result = true;
             }
         } catch (IOException | UnsupportedTagException | InvalidDataException e) {
@@ -166,4 +215,109 @@ public class Mp3FileUtil {
         }
         return result;
     }
+
+    public static boolean fileWasPublishedOrCantBe(File file) {
+        boolean result=false;
+        try {
+            Mp3File mp3 = new Mp3File(file);
+
+            ID3v1 tag = getTag(mp3);
+            if (tag != null && tag.getComment()!=null && ( tag.getComment().contains("spotifyTrackUploaded") ||
+                    tag.getComment().contains("spotifyUploadFailure") ||tag.getComment().contains("spotifyExistenceCheckFailed"))) {
+                result = true;
+            }
+        } catch (IOException | UnsupportedTagException | InvalidDataException |IllegalArgumentException e) {
+            e.printStackTrace();//This should never happen as we should have filtered out bad files by here, but if it happens continue on
+        }
+        return result;
+    }
+
+    public static boolean currentlyRetrying(File file) {
+        boolean result=false;
+        try {
+            Mp3File mp3 = new Mp3File(file);
+
+            ID3v1 tag = getTag(mp3);
+            if (tag != null && tag.getComment()!=null &&  tag.getComment().contains("spotifyRetry")){
+                result = true;
+            }
+        } catch (IOException | UnsupportedTagException | InvalidDataException e) {
+            e.printStackTrace();//This should never happen as we should have filtered out bad files by here, but if it happens continue on
+        }
+        return result;
+    }
+
+    public static boolean addCommentToFile(File file) {
+        boolean success = false;
+
+        Mp3File mp3 = null;
+        try {
+            mp3 = new Mp3File(file);
+        ID3v1 tag = getTag(mp3);
+        String comment = tag.getComment();
+        if (!comment.isEmpty()) {
+            comment = comment + ";spotifyTrackUploaded:true";
+        } else {
+            comment = "spotifyTrackUploaded";
+        }
+        tag.setComment(comment);
+        Mp3FileUtil.saveMp3(file.toPath(), mp3);
+        success=true;
+        } catch (IOException|UnsupportedTagException|InvalidDataException e) {
+            throw new RuntimeException(e);
+        }
+        return success;
+    }
+
+    public static boolean setStatusToUploadFailed(File file){
+        boolean success=false;
+        try {
+            Mp3File mp3=new Mp3File(file);
+            ID3v1 tag =Mp3FileUtil.getTag(mp3);
+            tag.setComment("spotifyUploadFailure");
+            Mp3FileUtil.saveMp3(file.toPath(),mp3);
+            success=true;
+        } catch (IOException |UnsupportedTagException|InvalidDataException ex) {
+
+        }
+        return success;
+    }
+
+    public static boolean setStatusToRetry(File file){
+        boolean success=false;
+        try {
+            Mp3File mp3=new Mp3File(file);
+            ID3v1 tag =Mp3FileUtil.getTag(mp3);
+            tag.setComment("spotifyRetry");
+            Mp3FileUtil.saveMp3(file.toPath(),mp3);
+            success=true;
+        } catch (IOException |UnsupportedTagException|InvalidDataException ex) {
+
+        }
+        return success;
+    }
+
+    public static boolean addTrackInformation(ID3v1 tag, SpotifyTrack track,File file,Mp3File mp3){
+        boolean success=false;
+        boolean retry=false;
+        String comment;
+
+        if(tag.getComment()!=null && tag.getComment().contains("spotifyRetry")){
+            retry=true;
+        }
+        comment = "spotifyTrackId:" + track.getId();
+        if (track.getAlbum() != null) {
+            comment += "; spotifyAlbumId:" + track.getAlbum().getId();
+        }
+        if(retry){
+            comment+=";spotifyRetry";
+        }
+        tag.setComment(comment);
+
+        mp3.setId3v2Tag(null);
+        mp3.setId3v1Tag(tag);
+        success = Mp3FileUtil.saveMp3(file.toPath(), mp3);
+        return success;
+    }
+
 }

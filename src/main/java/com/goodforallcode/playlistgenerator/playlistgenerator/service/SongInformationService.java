@@ -35,13 +35,17 @@ public class SongInformationService {
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (!Files.isDirectory(file)) {
 //TODO                    task.exposedUpdateProgress(task.getProgress() + share,numFiles);
-                        progressBar.setProgress(progressBar.getProgress() + share);
+                        if(progressBar!=null) {
+                            progressBar.setProgress(progressBar.getProgress() + share);
+                        }
                         if (file.getFileName().toString().endsWith("mp3")) {
                             Mp3Info info = fileToInfo(file, manuallyConfigureMp3Tags);
                             if (info != null) {
                                 songs.add(info);
                             }
                         }
+                    }else {
+                        System.out.println("h");
                     }
                     return FileVisitResult.CONTINUE;
                 }

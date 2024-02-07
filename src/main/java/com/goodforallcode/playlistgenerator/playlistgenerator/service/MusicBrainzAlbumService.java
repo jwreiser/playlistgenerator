@@ -27,7 +27,7 @@ public class MusicBrainzAlbumService {
         System.err.println("thread "+name+" out");
         return chooser.getChoice();
     }
-    public List<Album> getAlbums(String currentDirectory) {
+    public List<Album> getAlbums(String currentDirectory,boolean disambiguate) {
         List<Album> albums = new ArrayList<>();
         try {
             List<Path> dirs = Files.walk(Paths.get(currentDirectory), 10)
@@ -35,7 +35,7 @@ public class MusicBrainzAlbumService {
                     .collect(Collectors.toList());
 
             for (Path directory : dirs) {
-                albums.addAll(getAlbumsFromDirectory(directory));
+                albums.addAll(getAlbumsFromDirectory(directory,disambiguate));
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -43,7 +43,7 @@ public class MusicBrainzAlbumService {
         return albums;
     }
 
-    private List<Album> getAlbumsWhenOneArtist(Path directory, HashMap<String, HashMap<String, List<File>>> trackInformation, int numFiles) {
+    private List<Album> getAlbumsWhenOneArtist(Path directory, HashMap<String, HashMap<String, List<File>>> trackInformation, int numFiles,boolean disambiguate) {
         List<Album> albums = new ArrayList<>();
         String artist = (String) trackInformation.keySet().toArray()[0];
 
@@ -51,7 +51,7 @@ public class MusicBrainzAlbumService {
         int numAlbums = albumsTracks.size();
 
 
-        String choice;
+        String choice=null;
         List<String> artists, albumNames;
         List<File>currentFiles;
         albumNames = albumsTracks.keySet().stream().toList();
@@ -60,7 +60,9 @@ public class MusicBrainzAlbumService {
             currentFiles = albumsTracks.get(albumNames.get(0));
             albums.add(new Album(artist, albumNames.get(0), currentFiles));
         } else {
-            choice = useChooser(directory, "Album", albumNames);
+            if(disambiguate) {
+                choice = useChooser(directory, "Album", albumNames);
+            }
             if (choice != null) {
                 currentFiles = new ArrayList<>();
                 for (String albumName : albumNames) {
@@ -81,7 +83,8 @@ public class MusicBrainzAlbumService {
         return albums;
     }
 
-    private List<Album> getAlbumsWhenMultipleArtists(Path directory, HashMap<String, HashMap<String, List<File>>> trackInformation, List<String> tagArtists, int numFiles) throws IOException {
+    private List<Album> getAlbumsWhenMultipleArtists(Path directory, HashMap<String, HashMap<String, List<File>>> trackInformation
+            , List<String> tagArtists, int numFiles,boolean disambiguate) throws IOException {
         List<Album> albums = new ArrayList<>();
 
 
@@ -90,7 +93,7 @@ public class MusicBrainzAlbumService {
 
         String choice = null;
 
-        if (thisIsADirHoldingVariousArtists(directory)) {
+        if (thisIsADirHoldingVariousArtists(directory)&&disambiguate) {
             choice = useChooser(directory, "Artist", tagArtists);
         }
         if (choice != null) {
@@ -99,7 +102,7 @@ public class MusicBrainzAlbumService {
                     Mp3FileUtil.updateFileTags(file.toPath(), null, choice, null, null, null);
                 }
             }
-            albums = getAlbumsFromDirectory(directory);
+            albums = getAlbumsFromDirectory(directory,disambiguate);
         } else {
             for (String artist : tagArtists) {
                 albumsFiles = trackInformation.get(artist);
@@ -123,7 +126,7 @@ public class MusicBrainzAlbumService {
         return !(parentIsVA||weAreVA||grandParentIsVA);
     }
 
-    private List<Album> getAlbumsFromDirectory(Path directory) throws IOException {
+    private List<Album> getAlbumsFromDirectory(Path directory,boolean disambiguate) throws IOException {
         List<Album> albums = new ArrayList<>();
         String track, album, artist;
         Mp3File mp3;
@@ -183,9 +186,9 @@ public class MusicBrainzAlbumService {
 
         List<String> tagArtists = trackInformation.keySet().stream().toList();
         if (tagArtists.size() == 1) {
-            albums.addAll(getAlbumsWhenOneArtist(directory, trackInformation, numFiles));
+            albums.addAll(getAlbumsWhenOneArtist(directory, trackInformation, numFiles,disambiguate));
         } else if (tagArtists.size() > 1) {
-            albums.addAll(getAlbumsWhenMultipleArtists(directory, trackInformation, tagArtists, numFiles));
+            albums.addAll(getAlbumsWhenMultipleArtists(directory, trackInformation, tagArtists, numFiles,disambiguate));
         }
         return albums;
     }

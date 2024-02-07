@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.goodforallcode.playlistgenerator.model.domain.Album;
 import com.goodforallcode.playlistgenerator.model.domain.spotify.*;
 import com.goodforallcode.playlistgenerator.playlistgenerator.util.Mp3FileUtil;
+import com.goodforallcode.playlistgenerator.playlistgenerator.util.RESTUtil;
 import com.goodforallcode.playlistgenerator.playlistgenerator.util.StringUtil;
 import com.mpatric.mp3agic.*;
 import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.json.JSONObject;
 import com.goodforallcode.playlistgenerator.model.domain.musicbrainz.MusicBrainzCallResults;
 
+import javax.net.ssl.HttpsURLConnection;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -21,14 +23,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 
 public class SpotifyRestCaller {
     private static LevenshteinDistance distanceCalculator = LevenshteinDistance.getDefaultInstance();
-    private static String clientId = "9b2d07022df44017b911b6176dc19766";
-    private static String secret = "9154ba61d07940ee8f03c50f98ff88fb";
+    public static String clientId = "9b2d07022df44017b911b6176dc19766";
+    public static String secret = "9154ba61d07940ee8f03c50f98ff88fb";
     private static int ALBUM_NAME_DISTANCE_CUTOFF = 5;
     private static int ARTIST_NAME_DISTANCE_CUTOFF = 5;
     private static int TRACK_NAME_DISTANCE_CUTOFF = 10;
@@ -41,7 +45,7 @@ public class SpotifyRestCaller {
             String urlString = "https://accounts.spotify.com/api/token?grant_type=client_credentials&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8.toString())
                     + "&client_secret=" + URLEncoder.encode(secret, StandardCharsets.UTF_8.toString());
 
-            String json = callUrl("POST", urlString, null);
+            String json = RESTUtil.callUrl("POST", urlString, null);
             if (json != null) {
                 JSONObject object = new JSONObject(json);
                 if (object.has("access_token")) {
@@ -56,24 +60,49 @@ public class SpotifyRestCaller {
         return token;
     }
 
-    public void populateAdditionalSpotifyInformation(List<Album> albums, String token) {
-        List<String> albumIds = albums.stream().filter(a -> a.getAlbumItem() != null).map(a -> a.getAlbumItem().getId()).collect(Collectors.toList());
+    public void populateAlbumsWithAdditionalSpotifyInformation(List<Album> albumsToFetchTracksFor, String token) {
+        List<String> albumIds = albumsToFetchTracksFor.stream().filter(a -> a.getAlbumItem() != null).map(a -> a.getAlbumItem().getId()).collect(Collectors.toList());
         String joinedIds = String.join(",", albumIds);
         try {
             String urlString = "https://api.spotify.com/v1/albums?ids=" + URLEncoder.encode(joinedIds, StandardCharsets.UTF_8.toString());
 
-            String json = callUrl("GET", urlString, token);
-            ObjectMapper objectMapper = new ObjectMapper();
-            SpotifyAlbumListResults callResults = objectMapper.readValue(json, SpotifyAlbumListResults.class);
-            for (SpotifyAlbumItem resultItem : callResults.getAlbums()) {
-                for (Album album : albums) {
-                    if (album.getAlbumItem() != null && album.getAlbumItem().getId().equals(resultItem.getId())) {
-                        album.setAlbumItem(resultItem);
-                        break;
+            String json = RESTUtil.callUrl("GET", urlString, token);
+            if(json!=null) {
+                ObjectMapper objectMapper = new ObjectMapper();
+                SpotifyAlbumListResults callResults = objectMapper.readValue(json, SpotifyAlbumListResults.class);
+                String modifiedTargetTrack, modifiedSpotifyTrack;
+                String comment;
+                for (SpotifyAlbumItem resultItem : callResults.getAlbums()) {
+                    for (Album album : albumsToFetchTracksFor) {
+                        if (album.getAlbumItem() != null && album.getAlbumItem().getId().equals(resultItem.getId())) {
+                            album.setAlbumItem(resultItem);
+                            Mp3File mp3;
+                            ID3v1 currentTag;
+                            for (File file : album.getFiles()) {
+                                try {
+                                    mp3 = new Mp3File(file);
+                                    currentTag = Mp3FileUtil.getTag(mp3);
+                                    modifiedTargetTrack = StringUtil.cleanupTrack(currentTag.getTitle());
+
+                                    for (SpotifyTrack track : resultItem.getTracksContainer().getTracks()) {
+                                        modifiedSpotifyTrack = StringUtil.cleanupTrack(track.getName());
+                                        if (modifiedSpotifyTrack.contains(modifiedTargetTrack) || modifiedTargetTrack.contains(modifiedSpotifyTrack)) {
+                                           Mp3FileUtil.addTrackInformation(currentTag,track,file,mp3);
+                                            break;
+                                        }
+                                    }
+                                } catch (UnsupportedTagException | InvalidDataException e) {
+                                    //skip
+                                }
+
+                            }
+                            break;//stop looking at albums to fetch tracks for as we have one that matches a spotify result
+                        }
                     }
                 }
             }
-        } catch (IOException e) {
+        } catch (
+                IOException e) {
             throw new RuntimeException(e);
         }
 
@@ -85,7 +114,7 @@ public class SpotifyRestCaller {
             String urlString = "https://api.spotify.com/v1/users/" + URLEncoder.encode(userName, StandardCharsets.UTF_8.toString())
                     + "/playlists?limit=50";
 
-            String json = callUrl("GET", urlString, token);
+            String json = RESTUtil.callUrl("GET", urlString, token);
             ObjectMapper objectMapper = new ObjectMapper();
             SpotifyPlaylistResults callResults = objectMapper.readValue(json, SpotifyPlaylistResults.class);
             for (SpotifyPlaylist playlist : callResults.getPlaylists()) {
@@ -107,7 +136,7 @@ public class SpotifyRestCaller {
             String urlString = "https://api.spotify.com/v1/search?q=" + URLEncoder.encode((album + " " + artist), StandardCharsets.UTF_8.toString())
                     + "&type=album";
 
-            String json = callUrl("GET", urlString, token);
+            String json = RESTUtil.callUrl("GET", urlString, token);
             if (json != null) {
                 ObjectMapper objectMapper = new ObjectMapper();
                 SpotifyAlbumResults callResults = objectMapper.readValue(json, SpotifyAlbumResults.class);
@@ -153,7 +182,7 @@ public class SpotifyRestCaller {
                 try {
                     mp3 = new Mp3File(file);
                     ID3v1 tag = Mp3FileUtil.getTag(mp3);
-                    if (tag.getArtist()==null || tag.getArtist().toLowerCase().equals("various artists")) {
+                    if (tag.getArtist() == null || tag.getArtist().toLowerCase().equals("various artists")) {
                         currentResults = populateFileWithTrackSearchVariousArtists(tag.getTitle(), token, file.toPath(), album, mp3, tag);
                     } else {
                         currentResults = populateFileWithTrackSearch(tag.getArtist(), tag.getTitle(), token, file.toPath(), album, mp3, tag);
@@ -172,13 +201,13 @@ public class SpotifyRestCaller {
 
     private boolean populateFileWithTrackSearchVariousArtists(String trackName, String token, Path file, Album album, Mp3File mp3, ID3v1 tag) {
         boolean results = false;
-        trackName = StringUtil.removeTrailingText(trackName.toLowerCase());
+        trackName = StringUtil.removeTrailingText(trackName);
         long duration = mp3.getLengthInMilliseconds();
         try {
             String urlString = "https://api.spotify.com/v1/search?q=" + URLEncoder.encode((trackName), StandardCharsets.UTF_8.toString())
                     + "&type=track&limit=50";
 
-            String json = callUrl("GET", urlString, token);
+            String json = RESTUtil.callUrl("GET", urlString, token);
             long bestDurationDifference = Integer.MAX_VALUE, currentDurationDifference;
             SpotifyTrack bestTrack = null;
             if (json != null) {
@@ -196,9 +225,8 @@ public class SpotifyRestCaller {
                 }
                 if (bestTrack != null) {
                     tag.setArtist(bestTrack.getArtists().get(0).getName());
-                    tag.setComment("spotifyTrackId:" + bestTrack.getId() + "; spotifyAlbumId:" + bestTrack.getAlbum().getId());
                     album.getTracks().add(bestTrack);
-                    results = Mp3FileUtil.saveMp3(file, mp3);
+                    results = Mp3FileUtil.addTrackInformation(tag,bestTrack,file.toFile(),mp3);
                 } else {
                     tag.setComment("spotifyExistenceCheckFailed:" + LocalDate.now().toString());
                     Mp3FileUtil.saveMp3(file, mp3);
@@ -212,11 +240,11 @@ public class SpotifyRestCaller {
         return results;
     }
 
-    private boolean populateFileWithTrackSearch(String artist, String trackName, String token, Path file, Album album, Mp3File mp3, ID3v1 tag) {
+    public boolean populateFileWithTrackSearch(String artist, String trackName, String token, Path file, Album album, Mp3File mp3, ID3v1 tag) {
         boolean results = false;
 
-        String originalTrackName=trackName;
-        long duration=mp3.getLengthInMilliseconds();
+        String originalTrackName = trackName;
+        long duration = mp3.getLengthInMilliseconds();
         String[] artists = artist.toLowerCase().replaceFirst("dj ", "").split("/");
         try {
             String urlString = "https://api.spotify.com/v1/search?q=" + URLEncoder.encode((trackName + " " + artist), StandardCharsets.UTF_8.toString())
@@ -225,11 +253,11 @@ public class SpotifyRestCaller {
             //do after the search as it removes spaces
             trackName = StringUtil.cleanupTrack(trackName);
 
-            String json = callUrl("GET", urlString, token);
+            String json = RESTUtil.callUrl("GET", urlString, token);
             long bestDurationDifference = Integer.MAX_VALUE, currentDurationDifference;
             int currentDistance;
             SpotifyTrack bestTrack = null;
-            String modifiedTrackName,modifiedTrackArtist,modifiedTargetArtist;
+            String modifiedTrackName, modifiedTrackArtist, modifiedTargetArtist;
             if (json != null) {
                 ObjectMapper objectMapper = new ObjectMapper();
                 SpotifyTrackSearchResults callResults = objectMapper.readValue(json, SpotifyTrackSearchResults.class);
@@ -238,31 +266,30 @@ public class SpotifyRestCaller {
                     if (results) {
                         break;
                     }
-                    modifiedTrackName=StringUtil.cleanupTrack(track.getName());
+                    modifiedTrackName = StringUtil.cleanupTrack(track.getName());
                     for (SpotifyArtist trackArtist : track.getArtists()) {
                         //intentionally making this more similar by removing whitespace as that could make them different
-                        modifiedTrackArtist=StringUtil.cleanupArtist(trackArtist.getName());
+                        modifiedTrackArtist = StringUtil.cleanupArtist(trackArtist.getName());
 
                         if (trackName.equals(modifiedTrackName)) {
                             for (String artistName : artists) {
-                                modifiedTargetArtist=StringUtil.cleanupArtist(artistName);
-                                if (distanceCalculator.apply(modifiedTrackArtist,modifiedTargetArtist)<ARTIST_NAME_DISTANCE_CUTOFF) {
-                                    tag.setComment("spotifyTrackId:" + track.getId() + "; spotifyAlbumId:" + track.getAlbum().getId());
+                                modifiedTargetArtist = StringUtil.cleanupArtist(artistName);
+                                if (distanceCalculator.apply(modifiedTrackArtist, modifiedTargetArtist) < ARTIST_NAME_DISTANCE_CUTOFF) {
                                     album.getTracks().add(track);
-                                    results = Mp3FileUtil.saveMp3(file, mp3);
+                                    results = Mp3FileUtil.addTrackInformation(tag,track,file.toFile(),mp3);
                                     break;
                                 }
                             }
                             break;
                         } else {
                             currentDistance = distanceCalculator.apply(modifiedTrackName, trackName);
-                            currentDurationDifference= Math.abs(track.getDuration()-duration);
+                            currentDurationDifference = Math.abs(track.getDuration() - duration);
                             if (currentDurationDifference < bestDurationDifference) {
                                 if (currentDistance < TRACK_NAME_DISTANCE_CUTOFF || trackName.contains(modifiedTrackName)
                                         || modifiedTrackName.contains(trackName)) {
                                     for (String artistName : artists) {
-                                        modifiedTargetArtist=StringUtil.cleanupArtist(artistName);
-                                        if (modifiedTrackArtist.contains(modifiedTargetArtist)||modifiedTargetArtist.contains(modifiedTrackArtist)) {
+                                        modifiedTargetArtist = StringUtil.cleanupArtist(artistName);
+                                        if (modifiedTrackArtist.contains(modifiedTargetArtist) || modifiedTargetArtist.contains(modifiedTrackArtist)) {
                                             bestDurationDifference = currentDistance;
                                             bestTrack = track;
                                         }
@@ -274,27 +301,25 @@ public class SpotifyRestCaller {
                 }
                 if (!results) {
                     if (bestTrack == null) {
-                        if (StringUtil.hasTrailingText(trackName)||artist.toLowerCase().contains("feat")||artist.toLowerCase().contains("ft.")) {
-                            int end=artist.toLowerCase().indexOf("feat");
-                            if(end>0){
-                                artist=artist.substring(0,end).trim();
-                            }else{
-                                end=artist.toLowerCase().indexOf("ft.");
-                                if(end>0){
-                                    artist=artist.substring(0,end).trim();
+                        if (StringUtil.hasTrailingText(trackName) || artist.toLowerCase().contains("feat") || artist.toLowerCase().contains("ft.")) {
+                            int end = artist.toLowerCase().indexOf("feat");
+                            if (end > 0) {
+                                artist = artist.substring(0, end).trim();
+                            } else {
+                                end = artist.toLowerCase().indexOf("ft.");
+                                if (end > 0) {
+                                    artist = artist.substring(0, end).trim();
                                 }
                             }
-                            String originalTrackNameWithoutTrailing=StringUtil.removeTrailingText(originalTrackName);
-                            results = populateFileWithTrackSearch(artist,originalTrackNameWithoutTrailing , token, file, album, mp3, tag);
+                            String originalTrackNameWithoutTrailing = StringUtil.removeTrailingText(originalTrackName);
+                            results = populateFileWithTrackSearch(artist, originalTrackNameWithoutTrailing, token, file, album, mp3, tag);
                         } else {
                             tag.setComment("spotifyExistenceCheckFailed:" + LocalDate.now().toString());
                             Mp3FileUtil.saveMp3(file, mp3);
                         }
                     } else {
-                        tag.setComment("spotifyTrackId:" + bestTrack.getId() + "; spotifyAlbumId:" + bestTrack.getAlbum().getId());
                         album.getTracks().add(bestTrack);
-                        results = true;
-                        Mp3FileUtil.saveMp3(file, mp3);
+                        results = Mp3FileUtil.addTrackInformation(tag,bestTrack,file.toFile(),mp3);
                     }
                 }
             }
@@ -306,38 +331,63 @@ public class SpotifyRestCaller {
         return results;
     }
 
-
+    public boolean authorize() {
+        HttpsURLConnection spotifyAccounts = null;
+        boolean success=false;
+        try {
+            spotifyAccounts = (HttpsURLConnection) new URL("https://accounts.spotify.com/api/token?grant_type=client_credentials").openConnection();
+            spotifyAccounts.setDoOutput(true);
+            spotifyAccounts.setDoInput(true);
+            spotifyAccounts.setRequestMethod("POST");
+            String unencodedAuthorizationKey = "Basic " + clientId + ":" + secret;
+            String encodedKey = Base64.getEncoder().encodeToString(unencodedAuthorizationKey.getBytes());
+            spotifyAccounts.setRequestProperty("Authorization", encodedKey);
+            spotifyAccounts.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            spotifyAccounts.setRequestProperty("User-Agent", "Mozilla/5.0");
+            int totalLength = 0;
+            for (Map.Entry<String, List<String>> entry : spotifyAccounts.getRequestProperties().entrySet()) {
+                for (String string : entry.getValue()) {
+                    totalLength += string.getBytes().length;
+                }
+            }
+            spotifyAccounts.setRequestProperty("Content-Length", String.valueOf(totalLength));
+            spotifyAccounts.connect();
+            success=true;
+        } catch (IOException ex) {
+        }
+        return success;
+    }
     public boolean addPlaylistInformationToTracks(String artist, String albumName, String token, boolean compilation, Album album) {
         boolean results = false;
         albumName = StringUtil.cleanupAlbum(albumName);
 
-        boolean variousArtists=false;
-        if(List.of("various","various artists").contains(artist.toLowerCase())){
-            variousArtists=true;
+        boolean variousArtists = false;
+        if (artist==null || List.of("various", "various artists").contains(artist.toLowerCase())) {
+            variousArtists = true;
+        }else {
+            artist = StringUtil.cleanupArtist(artist);
         }
-
-        artist = StringUtil.cleanupArtist(artist);
 
         try {
             String urlString = "https://api.spotify.com/v1/search?q=" + URLEncoder.encode((albumName + " " + artist), StandardCharsets.UTF_8.toString())
                     + "&type=playlist";
-            if (compilation||variousArtists) {
+            if (compilation || variousArtists) {
                 urlString = "https://api.spotify.com/v1/search?q=" + URLEncoder.encode((albumName), StandardCharsets.UTF_8.toString())
                         + "&type=playlist";
             }
-            String json = callUrl("GET", urlString, token);
+            String json = RESTUtil.callUrl("GET", urlString, token);
             List<String> matchedTracks = new ArrayList<>();
             List<SpotifyTrackContainer> trackContainers;
             Mp3File mp3;
-            String trackTitle,modifiedPlaylistName;
+            String trackTitle, modifiedPlaylistName;
             ID3v1 tag = null;
             int totalTracks = album.getFiles().size();
             if (json != null) {
                 ObjectMapper objectMapper = new ObjectMapper();
                 SpotifySearchPlaylistResults callResults = objectMapper.readValue(json, SpotifySearchPlaylistResults.class);
                 for (SpotifyPlaylist playlist : callResults.getPlaylistContainer().getPlaylists()) {
-                    modifiedPlaylistName=StringUtil.cleanupAlbum(playlist.getName());
-                    if (modifiedPlaylistName.contains(albumName) && (variousArtists||modifiedPlaylistName.contains(artist))) {
+                    modifiedPlaylistName = StringUtil.cleanupAlbum(playlist.getName());
+                    if (modifiedPlaylistName.contains(albumName) && (variousArtists || modifiedPlaylistName.contains(artist))) {
                         if (results) {
                             break;
                         }
@@ -385,13 +435,12 @@ public class SpotifyRestCaller {
         String trackName;
         for (SpotifyTrackContainer container : trackContainers) {
             track = container.getTrack();
-            trackName=StringUtil.cleanupTrack(track.getName());
+            trackName = StringUtil.cleanupTrack(track.getName());
             if (trackName.contains(trackTitle)) {
                 if (album != null) {
                     album.getTracks().add(track);
+                    success = Mp3FileUtil.addTrackInformation(tag,track,file,mp3);
                 }
-                tag.setComment("spotifyTrackId:" + track.getId() + "; spotifyAlbumId:" + track.getAlbum().getId());
-                success = Mp3FileUtil.saveMp3(file.toPath(), mp3);
                 break;
             }
         }
@@ -403,7 +452,7 @@ public class SpotifyRestCaller {
 
         try {
 
-            String json = callUrl("GET", urlString, token);
+            String json = RESTUtil.callUrl("GET", urlString, token);
             if (json != null) {
                 ObjectMapper objectMapper = new ObjectMapper();
                 SpotifyPlaylistTracksResults callResults = objectMapper.readValue(json, SpotifyPlaylistTracksResults.class);
@@ -419,8 +468,21 @@ public class SpotifyRestCaller {
     }
 
     private static boolean albumHasCorrectArtist(String artist, SpotifyAlbumItem albumItem) {
-        String modifiedArtist = artist.toLowerCase();
-        return albumItem.getArtists().stream().anyMatch(a -> modifiedArtist.equals(a.getName().toLowerCase()));
+        boolean albumHasCorrectArtist=false;
+        long currentDistance;
+        String modifiedTargetArtist;
+        if(artist!=null){
+            String modifiedSpotifyArtist = StringUtil.cleanupArtist(artist);
+            for(SpotifyArtist currentArtist:albumItem.getArtists()){
+                modifiedTargetArtist=StringUtil.cleanupArtist(currentArtist.getName());
+                currentDistance=distanceCalculator.apply(modifiedTargetArtist,modifiedSpotifyArtist);
+                if(currentDistance<ARTIST_NAME_DISTANCE_CUTOFF){
+                    albumHasCorrectArtist=true;
+                    break;
+                }
+            }
+        }
+        return albumHasCorrectArtist;
     }
 
     private boolean isCorrectAlbumType(String albumName, String albumType, boolean isCompilation) {
@@ -441,46 +503,6 @@ public class SpotifyRestCaller {
         return isCorrectAlbumType;
     }
 
-    private static String callUrl(String method, String urlString, String token) throws IOException {
-        URL url = new URL(urlString);
-        String json = null;
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-        connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        connection.setRequestMethod(method);
-        if (token != null) {
-            connection.setRequestProperty("Authorization", "Bearer " + token);
-        } else {
-            connection.setDoOutput(true);
-            connection.getOutputStream().close();
-        }
-
-
-        // Collect the response code
-        int responseCode = connection.getResponseCode();
-        System.out.println(method + " Response Code :: " + responseCode);
-
-        if (responseCode == connection.HTTP_OK) {
-            // Create a reader with the input stream reader.
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));) {
-
-                String inputLine;
-
-                // Create a string buffer
-                StringBuffer response = new StringBuffer();
-
-                // Write each of the input line
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
-                }
-
-                json = response.toString();
-                //                ObjectMapper objectMapper = new ObjectMapper();
-                //                musicBrainzCallResults = objectMapper.readValue(json, MusicBrainzCallResults.class);
-            }
-        }
-        return json;
-    }
-
+    
 
 }

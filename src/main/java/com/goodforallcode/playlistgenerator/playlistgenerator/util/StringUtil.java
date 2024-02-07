@@ -15,7 +15,7 @@ public class StringUtil {
     }
 
     public static String cleanupArtist(String value) {
-        String result= value.toLowerCase().replaceAll("the "," ");
+        String result= value.toLowerCase().replaceAll("the "," ").replaceAll("tha "," ");
         result=result.replaceAll("7\" version","").replaceAll("12\" version","");
         result=result.replaceAll("é","e").replaceFirst("&","and")
                 .replaceAll("[^a-zA-Z0-9\\[\\]()]", "");
@@ -37,10 +37,13 @@ public class StringUtil {
 
     public static String removeTrailingText(String trackName){
         boolean hasTrailingText=false;
-        if (trackName.contains("[")) {
-            trackName = trackName.substring(0, trackName.indexOf("[")).trim();
-        } else if (trackName.contains("(")) {
-            trackName = trackName.substring(0, trackName.indexOf("(")).trim();
+        if(trackName!=null) {
+            trackName=trackName.toLowerCase();
+            if (trackName.contains("[")) {
+                trackName = trackName.substring(0, trackName.indexOf("[")).trim();
+            } else if (trackName.contains("(")) {
+                trackName = trackName.substring(0, trackName.indexOf("(")).trim();
+            }
         }
         return trackName;
     }

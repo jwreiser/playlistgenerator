@@ -10,6 +10,9 @@ module com.goodforallcode.playlistgenerator {
     requires decimal4j;
     requires guava;
     requires org.json;
+    requires java.net.http;
+    requires javafx.web;
+    requires spotify.web.api.java;
 
 
     opens com.goodforallcode.playlistgenerator.playlistgenerator to javafx.fxml;

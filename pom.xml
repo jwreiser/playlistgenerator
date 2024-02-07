@@ -51,6 +51,16 @@
             <artifactId>javafx-fxml</artifactId>
             <version>19</version>
         </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
+            <version>19</version>
+        </dependency>
+        <dependency>
+            <groupId>se.michaelthelin.spotify</groupId>
+            <artifactId>spotify-web-api-java</artifactId>
+            <version>2.0.3</version>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -91,6 +101,8 @@
             <version>20190722</version>
         </dependency>
 
+
+
     </dependencies>
 
     <build>
@@ -114,7 +126,7 @@
                         <id>default-cli</id>
                         <configuration>
                             <mainClass>
-                                com.goodforallcode.playlistgenerator/com.goodforallcode.playlistgenerator.playlistgenerator.HelloApplication
+                                com.goodforallcode.playlistgenerator/com.goodforallcode.playlistgenerator.playlistgenerator.JavaFXApplication
                             </mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
