@@ -1,15 +1,26 @@
 package com.goodforallcode.playlistgenerator.model.domain.musicbrainz;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Data;
-
-import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-@Data
 
 public class Tag {
-    int count;
-    String name;
+    private int count;
+    private String name;
+
+    public int getCount() {
+        return count;
+    }
+
+    public void setCount(int count) {
+        this.count = count;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 }

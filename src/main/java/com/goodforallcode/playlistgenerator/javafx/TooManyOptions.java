@@ -21,12 +21,26 @@ public class TooManyOptions {
     Path directory;
     String optionName="";
     List<String> options;
+    TextField manuaInput=new TextField();
 
+    final ComboBox optionsChoiceBox = new ComboBox();
     String choice=null;
     public TooManyOptions(Path directory, String optionName, List<String> options) {
         this.directory = directory;
         this.optionName = optionName;
         this.options = options;
+
+        //don't just modify passed in options as they may not be modifiable
+        List<String>updatedOptions=new ArrayList<>();
+        updatedOptions.addAll(options);
+        if(directory!=null) {
+            updatedOptions.add(directory.getFileName().toString());
+            updatedOptions.add(directory.getParent().getFileName().toString());
+        }
+
+        optionsChoiceBox.getItems().addAll(updatedOptions);
+
+
     }
 
     public boolean show(){
@@ -42,28 +56,19 @@ public class TooManyOptions {
         directoryLabel.setText("Directory");
         directoryLabel.setLabelFor(directoryInput);
 
-        //don't just modify passed in options as they may not be modifiable
-        List<String>updatedOptions=new ArrayList<>();
-        updatedOptions.addAll(options);
-        if(directory!=null) {
-            updatedOptions.add(directory.getFileName().toString());
-            updatedOptions.add(directory.getParent().getFileName().toString());
-        }
-        final ComboBox optionsChoiceBox = new ComboBox();
-        optionsChoiceBox.getItems().addAll(updatedOptions);
+
 
         Label optionsLabel=new Label();
         optionsLabel.setText(optionName);
         optionsLabel.setLabelFor(optionsChoiceBox);
 
-        TextField manuaInput=new TextField();
         Label manuaLabel=new Label();
         manuaLabel.setText("If you dont see a good option enter one");
         manuaLabel.setLabelFor(manuaInput);
 
 
         Button saveButton=new Button("Save Choice");
-        saveButton.setOnAction(e-> {choice=getChoice(optionsChoiceBox,manuaInput);stage.close();});
+        saveButton.setOnAction(e-> {choice=getChoice();stage.close();});
         VBox pane=new VBox(10);
         pane.setPadding(new Insets(10));
         pane.getChildren().addAll(directoryLabel,directoryInput,optionsLabel,optionsChoiceBox,manuaLabel,manuaInput,saveButton);
@@ -76,7 +81,7 @@ public class TooManyOptions {
         return true;
     }
 
-    private String getChoice(ComboBox optionsChoiceBox,TextField manuaInput){
+    public String getChoice(){
         if(!manuaInput.getText().isEmpty()){
             return manuaInput.getText();
         }else{

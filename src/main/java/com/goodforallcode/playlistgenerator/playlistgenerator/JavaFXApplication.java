@@ -1,5 +1,6 @@
 package com.goodforallcode.playlistgenerator.playlistgenerator;
 
+import com.goodforallcode.playlistgenerator.javafx.PlaylistFileGeneratingTask;
 import com.goodforallcode.playlistgenerator.javafx.PlaylistGeneratingTask;
 import com.goodforallcode.playlistgenerator.playlistgenerator.service.MusicBrainzAlbumService;
 import com.goodforallcode.playlistgenerator.playlistgenerator.service.SongInformationService;
@@ -57,9 +58,13 @@ public class JavaFXApplication extends Application {
 
         ProgressBar progress = new ProgressBar(0);
 
-        Button startButton=new Button();
-        startButton.setText("Generate Playlist");
-        startButton.setOnAction(e->generatePlaylist(directoryInput.getText(),progress,usernameInput.getText(),playlistInput.getText(),tagsCheckBox.isSelected(),disambiguateCheckBox.isSelected()));
+        Button filePlaylistButton=new Button();
+        filePlaylistButton.setText("1. Generate Playlist File");
+        filePlaylistButton.setOnAction(e->generatePlaylistFile(directoryInput.getText(),progress,usernameInput.getText(),playlistInput.getText(),tagsCheckBox.isSelected(),disambiguateCheckBox.isSelected()));
+
+        Button spotifyPlaylistButton=new Button();
+        spotifyPlaylistButton.setText("2. Generate Playlist");
+        spotifyPlaylistButton.setOnAction(e->generatePlaylist(directoryInput.getText(),progress,usernameInput.getText(),playlistInput.getText(),tagsCheckBox.isSelected(),disambiguateCheckBox.isSelected()));
 
         Button closeButton=new Button();
         closeButton.setText("Close");
@@ -67,7 +72,8 @@ public class JavaFXApplication extends Application {
         closeButton.setDisable(true);
 
         VBox pane=new VBox(15);
-        pane.getChildren().addAll(directoryButton,directoryLabel,directoryInput,usernameLabel,usernameInput,playlistLabel,playlistInput,tagsCheckBox,disambiguateCheckBox,progress,startButton,closeButton);
+        pane.getChildren().addAll(directoryButton,directoryLabel,directoryInput,usernameLabel,usernameInput,playlistLabel,playlistInput,tagsCheckBox,disambiguateCheckBox,progress,
+                filePlaylistButton,spotifyPlaylistButton,closeButton);
         pane.setAlignment(Pos.CENTER);
 
         Scene scene=new Scene(pane,500,500/*vert*/);
@@ -98,10 +104,17 @@ public class JavaFXApplication extends Application {
         File selectedDirectory = chooser.showOpenDialog(stage);
         fileInput.setText(selectedDirectory.getAbsolutePath());
     }
+    public void generatePlaylistFile(String directory,ProgressBar progress, String userName,String playlistName,boolean manuallyConfigureMp3Tags,boolean disambiguate){
+        PlaylistFileGeneratingTask task = new PlaylistFileGeneratingTask(directory,userName,playlistName,manuallyConfigureMp3Tags,disambiguate);
+//        progress.progressProperty().bind(task.progressProperty());
+//        task.setProgressBar(progress);
+        new Thread(task).start();
+//        Platform.runLater(task);
+    }
     public void generatePlaylist(String directory,ProgressBar progress, String userName,String playlistName,boolean manuallyConfigureMp3Tags,boolean disambiguate){
         PlaylistGeneratingTask task = new PlaylistGeneratingTask(directory,userName,playlistName,manuallyConfigureMp3Tags,disambiguate);
 //        progress.progressProperty().bind(task.progressProperty());
-        task.setProgressBar(progress);
+//        task.setProgressBar(progress);
         new Thread(task).start();
 //        Platform.runLater(task);
     }

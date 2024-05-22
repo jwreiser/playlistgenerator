@@ -13,6 +13,10 @@ module com.goodforallcode.playlistgenerator {
     requires java.net.http;
     requires javafx.web;
     requires spotify.web.api.java;
+    requires spring.context;
+    requires spring.batch.core;
+    requires spring.beans;
+    requires spring.tx;
 
 
     opens com.goodforallcode.playlistgenerator.playlistgenerator to javafx.fxml;

@@ -46,7 +46,7 @@ public class SpotifyRestCallerTests {
         assertNotNull(token);
         String id = caller.getPlaylistId("savecuomo", "Comprehensive", token);
         assertNotNull(id);
-        assertEquals("7owu50ooTT9XP6ywjkN1WT",id);
+        assertEquals("67t9aE3VRZZH5eIiYPVToA",id);
         id = caller.getPlaylistId("savecuomo", "Salsa Trap", token);
         assertNotNull(id);
         assertEquals("2Kcu5byMQm5qweZiFDoMe1",id);

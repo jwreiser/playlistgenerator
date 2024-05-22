@@ -21,8 +21,9 @@ public class Mp3FileUtilTests {
 
     @Test
     void testSaveMp3() throws InvalidDataException, UnsupportedTagException, IOException {
-        String path="C:\\Users\\justi\\OneDrive\\Desktop\\backup\\music\\Burned\\spacey electronic and world\\The Orb\\The Orb's Adventures Beyond the Ultraworld/Outlands.mp3";
+        String path="C:\\Users\\justi\\OneDrive\\Desktop\\backup\\music\\Burned\\test\\test.mp3";
         Path pathFile=Path.of(path);
+
         Mp3File mp3=new Mp3File(pathFile);
         Assertions.assertTrue(Mp3FileUtil.saveMp3(pathFile,mp3));
     }

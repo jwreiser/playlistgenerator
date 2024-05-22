@@ -21,6 +21,7 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.*;
@@ -86,8 +87,11 @@ public class PlaylistGeneratingTask extends Task<Void> implements Runnable{
         if (token == null||playlistId == null) {
             return null;
         }
-        System.err.println("Getting path lists");
-        Collection<List<Path>> pathLists = getPathLists();
+        List<Path> directories=null;
+        String filePath="C:\\temp\\playlist.txt";
+
+
+        Collection<List<Path>> pathLists = getPathLists( directories);
         System.err.println("Got path lists. Size:"+pathLists.size());
         for (List<Path> pathList:pathLists) {
             Platform.runLater(new Runnable() {
@@ -106,10 +110,8 @@ public class PlaylistGeneratingTask extends Task<Void> implements Runnable{
     }
 
     @NotNull
-    private Collection<List<Path>> getPathLists() throws IOException {
-        List<Path> directories = Files.walk(Paths.get(directory), 10)
-                .filter(Files::isDirectory)
-                .collect(Collectors.toList());
+    private Collection<List<Path>> getPathLists(List<Path> directories) throws IOException {
+
         List<Path> leafDirectories=new ArrayList<>();
         boolean leafDirectory;
         for (int i=0;i<directories.size();i++) {
